@@ -1,62 +1,75 @@
-def polynomial_to_binary(poly):
+def polynomial_to_binary(polynomial):
     """
-    Convert a polynomial like x4+x2+1 to a binary string.
+    Convert a polynomial representation like x4+x2+1 to a binary string.
     """
-    terms = poly.split('+')
-    max_power = int(terms[0][1:])
+    terms = polynomial.split('+')
+    print(terms)
+    max_power = int(terms[0][1:])  # Extract the highest power
     binary = ['0'] * (max_power + 1)
 
     for term in terms:
-        if term == '1':
-            binary[-1] = '1'
+        if len(term)==1:
+            #in this case there wont be anything next to x 
+            #so we cant do x[1:]
+            if term=='x':
+                power=1
+            elif term=='1':
+                power=0
         else:
-            power = int(term[1:])
-            binary[-(power + 1)] = '1'
-    
+            power=int(term[1:])
+        binary[-(power + 1)] = '1'
+    print(binary)
     return ''.join(binary)
 
-def calculate_remainder(data, generator):
-    data = list(map(int, data))
-    generator = list(map(int, generator))
-    for i in range(len(data) - len(generator) + 1):
-        if data[i] == 1:
-            for j in range(len(generator)):
-                data[i + j] ^= generator[j]
-    return ''.join(map(str, data[-(len(generator) - 1):]))
+def calculate_crc(message, key):
+    message = list(map(int, message))
+    key = list(map(int, key))
+    for i in range(len(message) - len(key) + 1):
+        if message[i] == 1:
+            for j in range(len(key)):
+                #storing the xor values in msg only
+                message[i + j] ^= key[j]
+    print(message)
+    remainder = message[(len(message) - len(key)+1):]
+    print("rem",remainder)
+    return ''.join(map(str, remainder))
 
-def send(data, generator):
-    padded_data = data + '0' * (len(generator) - 1)
-    crc = calculate_remainder(padded_data, generator)
-    codeword = data + crc
-    print("=== Sender ===")
-    print("Data:", data)
-    print("Generator:", generator)
-    print("CRC:", crc)
-    print("Codeword:", codeword)
+
+def sender_side(data, key):
+    l_key = len(key)
+    appended_data = data + '0' * (l_key - 1)
+    remainder = calculate_crc(appended_data, key)
+    codeword = data + remainder
+    print("=== Sender Side ===")
+    print("Input Data:", data)
+    print("Generator Polynomial (Binary):", key)
+    print("CRC:", remainder)
+    print("Codeword (Data + CRC):", codeword)
     return codeword
 
-def receive(codeword, generator):
-    remainder = calculate_remainder(codeword, generator)
-    print("\n=== Receiver ===")
-    print("Codeword:", codeword)
-    print("Generator:", generator)
-    print("Remainder:", remainder)
-    if remainder == '0' * (len(generator) - 1):
-        print("Result: No error.")
+def receiver_side(codeword, key):
+    remainder = calculate_crc(codeword, key)
+    print("\n=== Receiver Side ===")
+    print("Received Codeword:", codeword)
+    print("Generator Polynomial (Binary):", key)
+    print("Syndrome (Remainder):", remainder)
+    if remainder == '0' *(len(key)-1):
+        print("Result: No Error in transmission.")
     else:
-        print("Result: Error detected.")
+        print("Result: Error detected in transmission.")
 
 # Example usage
-data = '100100'
-polynomial = 'x4+x2+1'
+data = '1001'
+polynomial = 'x8+x2+x+1'
 
-# Convert polynomial to binary generator
-generator = polynomial_to_binary(polynomial)
+# Convert polynomial to binary key
+key = polynomial_to_binary(polynomial)
 
 # Sender Side
-codeword = send(data, generator)
+codeword = sender_side(data, key)
+print("code",codeword)
 
 print('---------------')
 
 # Receiver Side
-receive(codeword, generator)
+receiver_side(codeword, key)
