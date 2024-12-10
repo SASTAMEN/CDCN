@@ -1,190 +1,130 @@
-# Function to eliminate left recursion
-def eliminate_left_recursion(productions):
-    new_productions = {}
-    for nt, rhs in productions.items():
-        alpha = []
-        beta = []
-        for production in rhs:
-            if production.startswith(nt):
-                alpha.append(production[len(nt):])
-            else:
-                beta.append(production)
-        
-        if alpha:
-            new_nt = nt + "'"
-            new_productions[nt] = [b + new_nt for b in beta]
-            new_productions[new_nt] = [a + new_nt for a in alpha] + ['∈']
-        else:
-            new_productions[nt] = rhs
-    
-    return new_productions
+from collections import defaultdict
 
-# Function to find the longest common prefix (for left factoring)
-def longest_common_prefix(strings):
-    if not strings:
-        return ""
-    
-    prefix = strings[0]
-    for string in strings[1:]:
-        while not string.startswith(prefix):
-            prefix = prefix[:-1]
-            if not prefix:
-                return ""
-    return prefix
-
-# Function for left factoring
-def left_factoring(productions):
-    factored_productions = {}
-    for nt, rhs_list in productions.items():
-        common_prefix = longest_common_prefix(rhs_list)
-        
-        if common_prefix:
-            new_rhs = [rhs[len(common_prefix):] for rhs in rhs_list if rhs.startswith(common_prefix)]
-            new_nt = nt + "'"
-            factored_productions[nt] = [common_prefix + new_nt]
-            factored_productions[new_nt] = new_rhs + ['∈']
-        else:
-            factored_productions[nt] = rhs_list
-    
-    return factored_productions
-
-# Function to calculate First set
-def calc_first(nt, productions, first_sets):
-    if nt in first_sets:
-        return first_sets[nt]
-    
-    first = set()
-    rhs = productions[nt]
-    for production in rhs:
+def calc_first(nt, grammar, n):
+    der = []
+    ff = set()
+    for lhs, rhs in grammar.items():
+        if lhs == nt:
+            der = rhs
+            break
+    for production in der:
         if not production[0].isupper():
-            first.add(production[0])
+            ff.add(production[0])
         else:
-            for symbol in production:
-                if symbol.isupper():
-                    symbol_first = calc_first(symbol, productions, first_sets)
-                    first.update(symbol_first - {'∈'})
-                    if '∈' not in symbol_first:
-                        break
-                else:
-                    first.add(symbol)
-                    break
-    first_sets[nt] = first
-    return first
-
-# Function to calculate Follow set
-def calc_follow(nt, productions, first_sets, follow_sets, start_symbol):
-    if nt in follow_sets:
-        return follow_sets[nt]
-    
-    follow = set()
-    if nt == start_symbol:
-        follow.add('$')
-    
-    for lhs, rhs_list in productions.items():
-        for rhs in rhs_list:
-            for i in range(len(rhs)):
-                if rhs[i] == nt:
-                    if i + 1 < len(rhs):
-                        next_symbol = rhs[i + 1]
-                        if next_symbol.isupper():
-                            follow.update(first_sets[next_symbol] - {'∈'})
-                            if '∈' in first_sets[next_symbol]:
-                                follow.update(calc_follow(lhs, productions, first_sets, follow_sets, start_symbol))
-                        else:
-                            follow.add(next_symbol)
+            index = 0
+            while index < len(production):
+                eps = False
+                der2 = calc_first(production[index], grammar, n)
+                for x in der2:
+                    if x == '#':
+                        eps = True
                     else:
-                        follow.update(calc_follow(lhs, productions, first_sets, follow_sets, start_symbol))
-    
-    follow_sets[nt] = follow
-    return follow
+                        ff.add(x)
+                if eps:
+                    index += 1
+                else:
+                    break
+    return ff
 
-# Function to build the predictive parsing table
-def build_parse_table(productions, first_sets, follow_sets):
-    parse_table = {}
-    for nt, rhs_list in productions.items():
+def calc_follow(nt, grammar, n):
+    fl = set()
+    if nt == list(grammar.keys())[0]:
+        fl.add('$')
+    for lhs, rhs_list in grammar.items():
         for production in rhs_list:
-            if production == '∈':
-                for symbol in follow_sets[nt]:
-                    parse_table[(nt, symbol)] = production
+            for j, symbol in enumerate(production):
+                if symbol == nt:
+                    if j == len(production) - 1 and lhs != nt:
+                        fl.update(calc_follow(lhs, grammar, n))
+                    else:
+                        if j + 1 < len(production):
+                            next_symbol = production[j + 1]
+                            if not next_symbol.isupper() and next_symbol != '#':
+                                fl.add(next_symbol)
+                            else:
+                                index = j + 1
+                                while index < len(production):
+                                    eps = False
+                                    der2 = calc_first(production[index], grammar, n)
+                                    for x in der2:
+                                        if x == '#':
+                                            eps = True
+                                        else:
+                                            fl.add(x)
+                                    if eps:
+                                        index += 1
+                                        if index == len(production):
+                                            fl.update(calc_follow(lhs, grammar, n))
+                                    else:
+                                        break
+    return fl
+
+def build_parse_table(grammar, first, follow):
+    parse_table = {}
+    for nt, productions in grammar.items():
+        for production in productions:
+            if not production[0].isupper() and production[0] != '#':
+                parse_table[(nt, production[0])] = production
             else:
-                for symbol in first_sets[nt]:
-                    parse_table[(nt, symbol)] = production
+                first_set = calc_first(production[0], grammar, len(grammar))
+                for terminal in first_set:
+                    if terminal != '#':
+                        parse_table[(nt, terminal)] = production
+                if '#' in first_set or production[0] == '#':
+                    follow_set = calc_follow(nt, grammar, len(grammar))
+                    for follow_symbol in follow_set:
+                        if follow_symbol not in {' ', '\0'}:
+                            parse_table[(nt, follow_symbol)] = "#"
     return parse_table
 
-# Function to parse a string using the predictive parsing table
 def parse_string(input_string, parse_table, start_symbol):
     stack = ['$']
     stack.append(start_symbol)
-    input_string += '$'
     i = 0
-
-    while len(stack) > 0:
-        top = stack.pop()
+    while stack:
+        top = stack[-1]
         current = input_string[i]
-
         if top == current:
+            stack.pop()
             i += 1
         elif not top.isupper():
             return False
         elif (top, current) in parse_table:
+            stack.pop()
             production = parse_table[(top, current)]
-            if production != '∈':
+            if production != "#":
                 for symbol in reversed(production):
                     stack.append(symbol)
         else:
             return False
-    
-    return True
+    return i == len(input_string)
 
-# Main Function (as per the console format given in the picture)
-def run_grammar_processing():
-    # Input grammar
+def main():
     n = int(input("Enter the number of lines in the grammar: "))
-    productions = {}
-    print("Enter the different lines of grammar:")
+    grammar = defaultdict(list)
+    print("Enter the grammar lines:")
     for _ in range(n):
-        line = input().strip()
-        lhs, rhs = line.split("→")
-        productions[lhs.strip()] = [x.strip() for x in rhs.split('|')]
-
-    # Step 1: Eliminate Left Recursion
-    productions = eliminate_left_recursion(productions)
-
-    # Step 2: Left Factoring
-    productions = left_factoring(productions)
-
-    # Step 3: Calculate First and Follow sets
-    first_sets = {}
-    follow_sets = {}
-    start_symbol = list(productions.keys())[0]
-
-    for nt in productions:
-        calc_first(nt, productions, first_sets)
-    for nt in productions:
-        calc_follow(nt, productions, first_sets, follow_sets, start_symbol)
-
-    # Display First sets
-    for nt, first in first_sets.items():
-        print(f"First of {nt} {{{','.join(first)}}}")
-
-    # Display Follow sets
-    for nt, follow in follow_sets.items():
-        print(f"Follow of {nt} {{{','.join(follow)}}}")
-
-    # Step 4: Build Predictive Parsing Table
-    parse_table = build_parse_table(productions, first_sets, follow_sets)
-
-    # Display Predictive Parsing Table
-    print("Predictive Parsing Table:")
-    for (nt, terminal), production in parse_table.items():
-        print(f"M[{nt}, {terminal}] = {production}")
-
-    # Step 5: Parse Input String
+        s = input().strip()
+        lhs, rhs = s.split("->")
+        productions = rhs.split("/")
+        grammar[lhs.strip()] = [prod.strip() for prod in productions]
+    first = {nt: calc_first(nt, grammar, n) for nt in grammar}
+    follow = {nt: calc_follow(nt, grammar, n) for nt in grammar}
+    print("\nFirst Sets:")
+    for nt, first_set in first.items():
+        print(f"First({nt}): {', '.join(sorted(first_set))}")
+    print("\nFollow Sets:")
+    for nt, follow_set in follow.items():
+        print(f"Follow({nt}): {', '.join(sorted(follow_set))}")
+    parse_table = build_parse_table(grammar, first, follow)
+    print("\nPredictive Parse Table:")
+    for key, value in parse_table.items():
+        print(f"M[{key[0]}, {key[1]}] = {value}")
     input_string = input("Enter the string to parse (end with $): ").strip()
-    if parse_string(input_string, parse_table, start_symbol):
+    if parse_string(input_string, parse_table, list(grammar.keys())[0]):
         print("The string is accepted by the grammar.")
     else:
         print("The string is rejected by the grammar.")
 
-# Run the main function
-run_grammar_processing()
+if _name_ == "_main_":
+    main()
