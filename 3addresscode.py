@@ -11,7 +11,7 @@ def infix_to_postfix(expr):
     for ch in expr:
         if ch.isspace():
             continue
-        if ch.isalnum():  # Operand
+        if ch.isalnum():  # Operand (numbers or variables)
             postfix.append(ch)
         elif ch == '(':
             operators.append(ch)
@@ -23,6 +23,8 @@ def infix_to_postfix(expr):
             while operators and precedence(operators[-1]) >= precedence(ch):
                 postfix.append(operators.pop())
             operators.append(ch)
+    
+    # Pop remaining operators
     while operators:
         postfix.append(operators.pop())
     return ''.join(postfix)
@@ -37,24 +39,26 @@ def generate_tac(expr):
     code = []
     tc = 1
     for ch in expr:
-        if ch in '+-*/':
+        if ch in '+-*/':  # Operator
             op1 = s.pop()
             op2 = s.pop()
             temp, tc = generate_temp(tc)
             instruction = f"{temp} := {op2} {ch} {op1}"
             code.append(instruction)
             s.append(temp)
-        else:  # Operand
+        else:  # Operand (variable or number)
             s.append(ch)
+    
+    # Final result
     if s:
         result = s.pop()
         code.append(f"Result := {result}")
+    
     print("The intermediate code:")
     for line in code:
         print(line)
 
-if _name_ == "_main_":
-    expr = input("Enter the Expression: ")
-    reversed_expr = expr[::-1]  # Reverse the expression
-    postfix_expr = infix_to_postfix(reversed_expr)
-    generate_tac(postfix_expr)
+# Main program
+expr = input("Enter the Expression: ")
+postfix_expr = infix_to_postfix(expr)  # Directly convert infix to postfix
+generate_tac(postfix_expr)
