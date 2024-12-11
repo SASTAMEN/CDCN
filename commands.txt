@@ -1,0 +1,31 @@
+Login:10.45.8.13:9090
+
+
+File creation and saving :
+
+vi file.l
+i (to insert)
+esc
+:wq! (save)
+
+
+
+LEX execution:
+
+lex file.l
+cc lex.yy.c
+./a.out
+
+
+
+Yacc program creation :
+Vi fn.l
+Vi fn.y
+
+
+Yaac program execution:
+
+Lex fn.l
+Yacc_d fn.y
+Gcc lex.yy.c fn.tab.c
+./a.out
