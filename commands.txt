@@ -26,6 +26,6 @@ Vi fn.y
 Yaac program execution:
 
 Lex fn.l
-Yacc_d fn.y
+Yacc -d fn.y
 Gcc lex.yy.c fn.tab.c
 ./a.out
