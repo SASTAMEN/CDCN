@@ -17,7 +17,6 @@ cc lex.yy.c
 ./a.out
 
 
-
 Yacc program creation :
 Vi fn.l
 Vi fn.y
@@ -26,6 +25,6 @@ Vi fn.y
 Yaac program execution:
 
 Lex fn.l
-Yacc -d fn.y
-Gcc lex.yy.c fn.tab.c
+Bison -d fn.y
+cc lex.yy.c fn.tab.c
 ./a.out
